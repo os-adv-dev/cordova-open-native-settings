@@ -1,4 +1,6 @@
 #import "NativeSettings.h"
+#import <UserNotifications/UserNotifications.h>
+#import <Cordova/CDVPlugin.h>
 
 @implementation NativeSettings
 
@@ -186,6 +188,47 @@
     }
     
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+}
+
+// Request notification permission (Objective-C equivalent of Swift version)
+- (void)requestPermission:(CDVInvokedUrlCommand*)command {
+    UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+    UNAuthorizationOptions options = UNAuthorizationOptionAlert | UNAuthorizationOptionSound | UNAuthorizationOptionBadge;
+    
+    [center requestAuthorizationWithOptions:options completionHandler:^(BOOL granted, NSError * _Nullable error) {
+        CDVPluginResult* pluginResult = nil;
+        if (error) {
+            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Failed to request permissions"];
+        } else {
+            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:granted];
+        }
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    }];
+}
+
+// Check if notification permission has been granted
+- (void)hasPermission:(CDVInvokedUrlCommand*)command {
+    UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+    [center getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings * _Nonnull settings) {
+        BOOL granted = NO;
+        switch (settings.authorizationStatus) {
+            case UNAuthorizationStatusAuthorized:
+            case UNAuthorizationStatusProvisional:
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 140000
+            case UNAuthorizationStatusEphemeral:
+#endif
+                granted = YES;
+                break;
+            case UNAuthorizationStatusDenied:
+            case UNAuthorizationStatusNotDetermined:
+            default:
+                granted = NO;
+                break;
+        }
+        
+        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:granted];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    }];
 }
 
 @end
