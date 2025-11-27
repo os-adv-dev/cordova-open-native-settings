@@ -6,4 +6,12 @@ NativeSettings.open = function(setting, onsucess, onfail) {
 	cordova.exec(onsucess, onfail, "NativeSettings", "open", settings);
 };
 
+NativeSettings.hasPermission = function(onsucess, onfail) {
+	cordova.exec(onsucess, onfail, "NativeSettings", "hasPermission");
+};
+
+NativeSettings.requestPermission = function(onsucess, onfail) {
+	cordova.exec(onsucess, onfail, "NativeSettings", "requestPermission");
+};
+
 module.exports = NativeSettings;
