@@ -23,10 +23,27 @@ import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaPlugin;
 import org.apache.cordova.PluginResult;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
+import androidx.core.app.ActivityCompat;
+import androidx.core.app.NotificationManagerCompat;
+
 public class NativeSettings extends CordovaPlugin {
 
+	private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 123123;
+    private CallbackContext permissionCallback;
+	
     @Override
     public boolean execute(String action, JSONArray args, CallbackContext callbackContext) throws JSONException {
+
+		if ("requestPermission".equals(action)) {
+            requestPermission(callbackContext);
+            return true;
+        } else if ("hasPermission".equals(action)) {
+            hasPermission(callbackContext);
+            return true;
+        }
+		
 		Context context=this.cordova.getActivity().getApplicationContext();
         PluginResult.Status status = PluginResult.Status.OK;
         Uri packageUri = Uri.parse("package:" + this.cordova.getActivity().getPackageName());
@@ -176,5 +193,58 @@ public class NativeSettings extends CordovaPlugin {
         callbackContext.sendPluginResult(new PluginResult(status, result));
         return true;
     }
-}
 
+	    private void requestPermission(CallbackContext callbackContext) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            // ✅ For Android < 13: permission is always granted
+            callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, true));
+            return;
+        }
+
+        if (ActivityCompat.checkSelfPermission(
+                this.cordova.getContext(),
+                Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED) {
+            // ✅ Already granted
+            callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, true));
+        } else {
+            // ✅ Request permission
+            permissionCallback = callbackContext;
+            cordova.requestPermission(this, NOTIFICATION_PERMISSION_REQUEST_CODE, Manifest.permission.POST_NOTIFICATIONS);
+        }
+    }
+
+    private void hasPermission(CallbackContext callbackContext) {
+        boolean hasPermission;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            hasPermission = ActivityCompat.checkSelfPermission(
+                    this.cordova.getContext(),
+                    Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED;
+        } else {
+            // ✅ For older versions: check if notifications are enabled
+            NotificationManagerCompat notificationManager =
+                    NotificationManagerCompat.from(this.cordova.getContext());
+            hasPermission = notificationManager.areNotificationsEnabled();
+        }
+
+        callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, hasPermission));
+    }
+
+    @Override
+    public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults) throws JSONException {
+        if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE && permissionCallback != null) {
+            boolean granted = true;
+            for (int result : grantResults) {
+                if (result != PackageManager.PERMISSION_GRANTED) {
+                    granted = false;
+                    break;
+                }
+            }
+            permissionCallback.sendPluginResult(new PluginResult(PluginResult.Status.OK, granted));
+            permissionCallback = null;
+        }
+    }
+	
+}
